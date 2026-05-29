@@ -233,7 +233,8 @@ int main() {
             }
         });
 
-    app.ssl_file("cert.pem", "key.pem");
+    app.ssl_file("rfhlab.de_ssl_certificate.cer",
+             "_.rfhlab.de_private_key.key_neustart05032026.key");
     app.bindaddr("::"); // Dual-Stack hört auf alle lokalen IPs inklusive 172.16.130.85
 
     const char* port_env = getenv("PORT");

@@ -42,6 +42,115 @@
         let token = "", username = "", serverIdx = 0, socket;
         
         // Exakt auf deine IP-Adresse und deine Ports gemappt
+        // Kombination aus IPv4 und IPv6 (auf beiden Servern identisch)
+        const serverList = [
+            "wss://172.16.130.85:443/chat",        // 1. Versuch: Server 1 via IPv4
+            "wss://[2001:db8:130::86]:443/chat",   // 2. Versuch: Server 2 via IPv6 (Wichtig: eckige Klammern!)
+            "wss://[2001:db8:130::85]:443/chat",   // 3. Versuch: Server 1 via IPv6
+            "wss://172.16.130.86:443/chat"         // 4. Versuch: Server 2 via IPv4
+        ];
+
+        async function handleAuth(endpoint) {
+            const u = document.getElementById("username").value;
+            const p = document.getElementById("password").value;
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                body: JSON.stringify({username: u, password: p})
+            });
+            const text = await res.text();
+            if(res.ok) {
+                if(endpoint === '/login') {
+                    token = JSON.parse(text).token; username = u;
+                    document.getElementById("auth-container").style.display = "none";
+                    document.getElementById("chat-container").style.display = "block";
+                    document.getElementById("user-display").textContent = "User: " + username;
+                    connect();
+                } else { alert("Konto angelegt!"); }
+            } else { alert(text); }
+        }
+
+        function connect() {
+            const status = document.getElementById("status");
+            status.textContent = `Knoten ${serverIdx + 1}...`;
+            
+            socket = new WebSocket(`${serverList[serverIdx]}?token=${token}`);
+            
+            socket.onopen = () => { status.textContent = "Online"; status.style.color = "green"; };
+            
+            socket.onmessage = (e) => {
+                const box = document.getElementById("chatbox");
+                const p = document.createElement("p");
+                if(e.data.includes("<img")) p.innerHTML = e.data; else p.textContent = e.data;
+                box.appendChild(p); box.scrollTop = box.scrollHeight;
+            };
+            
+            socket.onclose = () => {
+                status.textContent = "Wechsle Knoten..."; status.style.color = "red";
+                serverIdx = (serverIdx + 1) % serverList.length; 
+                setTimeout(connect, 2000);
+            };
+        }
+
+        function send() {
+            const input = document.getElementById("message");
+            if(input.value.trim() !== "" && socket.readyState === WebSocket.OPEN) {
+                socket.send(input.value); input.value = "";
+            }
+        }
+
+        function sendImg() {
+            const file = document.getElementById("img-file").files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => { if(socket.readyState === WebSocket.OPEN) socket.send(e.target.result); };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Enterprise Failover Chat</title>
+    <style>
+        body { font-family: sans-serif; background: #f1f5f9; padding: 20px; }
+        #auth-container, #chat-container { max-width: 400px; margin: 50px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #chat-container { display: none; max-width: 600px; }
+        #chatbox { width: 100%; height: 300px; border: 1px solid #cbd5e1; overflow-y: scroll; background: #f8fafc; padding: 10px; box-sizing: border-box; margin-bottom: 10px; }
+        #chatbox p { margin: 5px 0; padding: 5px; background: white; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        input[type="text"], input[type="password"] { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #2563eb; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        #status { font-size: 0.85em; color: #d97706; text-align: right; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-container">
+        <h3>Enterprise Login</h3>
+        <input type="text" id="username" placeholder="Benutzername">
+        <input type="password" id="password" placeholder="Passwort">
+        <button onclick="handleAuth('/login')">Einloggen</button>
+        <button style="background:#64748b" onclick="handleAuth('/register')">Registrieren</button>
+    </div>
+
+    <div id="chat-container">
+        <div style="display: flex; justify-content: space-between;">
+            <h4 id="user-display">Chat</h4>
+            <div id="status">Verbinde...</div>
+        </div>
+        <div id="chatbox"></div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="message" placeholder="Nachricht..." onkeypress="if(event.key==='Enter') send()">
+            <input type="file" id="img-file" accept="image/*" style="display:none" onchange="sendImg()">
+            <button onclick="document.getElementById('img-file').click()" style="width:50px; background:#475569">📷</button>
+            <button onclick="send()" style="width:80px">Senden</button>
+        </div>
+    </div>
+
+    <script>
+        let token = "", username = "", serverIdx = 0, socket;
+        
+        // Exakt auf deine IP-Adresse und deine Ports gemappt
         const serverList = [
             "wss://172.16.130.85:443/chat", // Instanz 1 (Haupt)
             "wss://172.16.130.85:444/chat", // Instanz 2 (Backup)

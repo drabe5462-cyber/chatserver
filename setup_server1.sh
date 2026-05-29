@@ -1,42 +1,47 @@
 #!/bin/bash
 echo "========================================================"
-echo " START: AUTOMATISCHES SETUP FÜR SERVER 1 (Zusatzknoten)"
+echo " START: SETUP FÜR SERVER 1 MIT ECHTEM SSL-ZERTIFIKAT"
 echo "========================================================"
 
-# 1. System aktualisieren & Debian-Pakete installieren
-echo "[1/5] Installiere benötigte Debian-Pakete..."
+# 1. System aktualisieren & Pakete installieren (inklusive unzip)
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y build-essential libssl-dev libsqlite3-dev libredis++-dev libbcrypt-dev redis-server wget
+sudo apt install -y build-essential libssl-dev libsqlite3-dev libredis++-dev libbcrypt-dev redis-server wget unzip
 
-# 2. Lokalen Redis-Dienst abschalten (Server 1 nutzt den Redis von Server 2)
-echo "[2/5] Deaktiviere lokalen Redis-Dienst..."
+# 2. Lokalen Redis-Dienst abschalten
 sudo systemctl stop redis-server
 sudo systemctl disable redis-server
 
-# 3. Projektverzeichnis 'chat_project' und 'templates' anlegen
-echo "[3/5] Erstelle Projektverzeichnisstruktur..."
+# 3. Projektverzeichnis anlegen
 mkdir -p ~/chat_project/templates
 
-# 4. In den Ordner wechseln und crow_all.h herunterladen
-echo "[4/5] Lade Web-Framework (crow_all.h) herunter..."
+# 4. crow_all.h herunterladen
 cd ~/chat_project
 wget https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h
 
-# 5. Selbstsignierte SSL-Zertifikate für HTTPS/WSS generieren
-echo "[5/5] Generiere SSL/TLS-Zertifikate..."
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj "/C=DE/ST=State/L=City/O=Enterprise/CN=172.16.130.85"
+# 5. EIGENE SSL-ZERTIFIKATE EINBINDEN
+echo "[SSL] Verarbeite rfhlab.de Zertifikate..."
 
-# 6. System-Bibliotheken auffrischen
+# Privaten Schlüssel kopieren und für Crow vorbereiten
+if [ -f ~/_.rfhlab.de_private_key.key_neustart05032026.key ]; then
+    cp ~/_.rfhlab.de_private_key.key_neustart05032026.key ~/chat_project/key.pem
+else
+    echo "WARNUNG: Private Key nicht in ~/ gefunden!"
+fi
+
+# ZIP-Archiv entpacken und Certificate Chain (Bundle) erstellen
+if [ -f ~/_.rfhlab.de_ssl_certificate_INTERMEDIATE.zip ]; then
+    mkdir -p /tmp/ssl_unpack
+    unzip -q ~/_.rfhlab.de_ssl_certificate_INTERMEDIATE.zip -d /tmp/ssl_unpack
+    
+    # Automatische Zusammenführung von Domain-Zertifikat und Intermediate/Bundle
+    # Falls dein Zip andere Dateinamen hat, hier kurz anpassen:
+    cat /tmp/ssl_unpack/*.crt > ~/chat_project/cert.pem
+    rm -rf /tmp/ssl_unpack
+else
+    echo "WARNUNG: SSL-Zip-Archiv nicht in ~/ gefunden!"
+fi
+
 sudo ldconfig
-
 echo "========================================================"
 echo " Server 1 erfolgreich eingerichtet!"
-echo " Ordner: ~/chat_project"
-echo "========================================================"
-echo " NÄCHSTE SCHRITTE:"
-echo " 1. Erstelle ~/chat_project/server.cpp"
-echo " 2. Erstelle ~/chat_project/templates/index.html"
-echo " 3. Kompiliere mit:"
-echo "    g++ -std=c++17 server.cpp -o chat_server -DCROW_ENABLE_SSL -lpthread -lssl -lcrypto -lredis++ -lsqlite3 -lbcrypt"
-echo " 4. Starten mit: sudo PORT=443 ./chat_server 2001:db8:130::86"
 echo "========================================================"

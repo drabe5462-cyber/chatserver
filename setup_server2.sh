@@ -1,5 +1,55 @@
 #!/bin/bash
 echo "========================================================"
+echo " START: SETUP FÜR SERVER 2 MIT ECHTEM SSL-ZERTIFIKAT"
+echo "========================================================"
+
+# 1. System-Pakete installieren
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y build-essential libssl-dev libsqlite3-dev libredis++-dev libbcrypt-dev redis-server ufw wget unzip
+
+# 2. Redis Konfiguration für das Netzwerk öffnen
+REDIS_CONF="/etc/redis/redis.conf"
+sudo sed -i 's/^bind .*/bind 0.0.0.0 ::/' $REDIS_CONF
+sudo sed -i 's/^protected-mode yes/protected-mode no/' $REDIS_CONF
+if ! grep -q "requirepass MeinSicheresNetzwerkPasswort" "$REDIS_CONF"; then
+    echo "requirepass MeinSicheresNetzwerkPasswort" | sudo tee -a $REDIS_CONF
+fi
+sudo systemctl restart redis-server
+
+# 3. Firewall für Server 1 öffnen (Bitte hier die echte IP von Server 1 eintragen!)
+sudo ufw allow from 172.16.130.85 to any port 6379 proto tcp
+sudo ufw --force enable
+
+# 4. Ordnerstruktur erstellen
+mkdir -p ~/chat_project/templates
+
+# 5. crow_all.h herunterladen
+cd ~/chat_project
+wget https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h
+
+# 6. EIGENE SSL-ZERTIFIKATE EINBINDEN
+echo "[SSL] Verarbeite rfhlab.de Zertifikate..."
+
+if [ -f ~/_.rfhlab.de_private_key.key_neustart05032026.key ]; then
+    cp ~/_.rfhlab.de_private_key.key_neustart05032026.key ~/chat_project/key.pem
+else
+    echo "WARNUNG: Private Key nicht in ~/ gefunden!"
+fi
+
+if [ -f ~/_.rfhlab.de_ssl_certificate_INTERMEDIATE.zip ]; then
+    mkdir -p /tmp/ssl_unpack
+    unzip -q ~/_.rfhlab.de_ssl_certificate_INTERMEDIATE.zip -d /tmp/ssl_unpack
+    cat /tmp/ssl_unpack/*.crt > ~/chat_project/cert.pem
+    rm -rf /tmp/ssl_unpack
+else
+    echo "WARNUNG: SSL-Zip-Archiv nicht in ~/ gefunden!"
+fi
+
+sudo ldconfig
+echo "========================================================"
+echo " Server 2 (Zentrale) erfolgreich eingerichtet!"
+echo "========================================================"#!/bin/bash
+echo "========================================================"
 echo " START: AUTOMATISCHES SETUP FÜR SERVER 2 (Zentrale + Redis)"
 echo "========================================================"
 
